@@ -21,13 +21,31 @@ router.get("/", async (req, res) => {
 // POST /walks - Ajouter une balade
 router.post("/", async (req, res) => {
 	const meetings = JSON.stringify(req.body.meetings);
-	const { date, time, duration, walked_dog, walking_human, pooped, peed } =
-		req.body;
+	const {
+		date,
+		time,
+		duration,
+		walked_dog,
+		walking_human,
+		pooped,
+		peed,
+		notes,
+	} = req.body;
 
 	try {
 		const sqlResult = await Pool.query(
-			"INSERT INTO walks (date, time, duration, meetings, pooped, peed, walked_dog, walking_human) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *",
-			[date, time, duration, meetings, pooped, peed, walked_dog, walking_human],
+			"INSERT INTO walks (date, time, duration, meetings, pooped, peed, walked_dog, walking_human, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *",
+			[
+				date,
+				time,
+				duration,
+				meetings,
+				pooped,
+				peed,
+				walked_dog,
+				walking_human,
+				notes,
+			],
 		);
 
 		res.status(200).json({ result: true, savedBalade: sqlResult.rows[0] });
@@ -46,7 +64,48 @@ router.delete("/:walkId", async (req, res) => {
 			"DELETE FROM walks WHERE id = $1 RETURNING *",
 			[walkId],
 		);
-		res.status(200).json({ result: true, deletedWalk: sqlResult.rows[0] });
+		res.status(200).json({
+			result: true,
+			deletedWalk: sqlResult.rows[0],
+			message: "Balade supprimée !",
+		});
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ result: false, message: err.message });
+	}
+});
+
+// UPDATE Mettre à jour une balade
+router.patch("/update/:walkId", async (req, res) => {
+	const { walkId } = req.params;
+	const queryParts = []; // récupérer les strings avec $1, $2, etc pour SQL
+	const queryValues = []; // récupérer les valeurs dans le même ordre
+
+	try {
+		for (const [key, value] of Object.entries(req.body)) {
+			// [["duration": 15], ["notes": "Cool"]]
+			queryValues.push(value);
+			queryParts.push(`${key} = $${queryValues.length}`);
+		}
+
+		const queryString = queryParts.join(", ");
+
+		const sqlResult = await Pool.query(
+			`UPDATE walks SET ${queryString} WHERE id = ${walkId} RETURNING *`,
+			queryValues,
+		);
+
+		if (sqlResult.rowCount === 0) {
+			return res
+				.status(404)
+				.json({ result: false, message: "Balade non trouvée." });
+		}
+
+		res.status(200).json({
+			result: true,
+			updatedWalk: sqlResult.rows[0],
+			message: "Balade mise à jour !",
+		});
 	} catch (err) {
 		console.error(err);
 		res.status(500).json({ result: false, message: err.message });
