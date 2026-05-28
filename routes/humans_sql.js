@@ -26,8 +26,8 @@ router.get("/", async (req, res) => {
 		// Vérifier qu'il y a une réponse (.length, propriété particulière SQL ?)
 		res.status(200).json({
 			result: true,
-			allHumans: allHumansWithoutPassword,
 			nbOfHumans: allHumansWithoutPassword.length,
+			allHumans: allHumansWithoutPassword,
 		});
 	} catch (err) {
 		console.error(err);
@@ -58,12 +58,10 @@ router.post(
 			);
 
 			if (checkEmail.rowCount > 0) {
-				return res
-					.status(400)
-					.json({
-						result: false,
-						message: `Un compte existe déjà avec cet email, ${checkEmail.rows[0].username}.`,
-					});
+				return res.status(400).json({
+					result: false,
+					message: `Un compte existe déjà avec cet email, ${checkEmail.rows[0].username}.`,
+				});
 			}
 
 			const hashPassword = await bcrypt.hashSync(password, 10);

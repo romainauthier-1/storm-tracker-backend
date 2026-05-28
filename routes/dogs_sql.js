@@ -23,8 +23,20 @@ router.post("/", async (req, res) => {
 	const { name, human, birth_date, gender, race1, race2 } = req.body;
 
 	try {
+		const checkDog = await Pool.query(
+			"SELECT * FROM dogs WHERE human = $1 AND name = $2",
+			[human, name],
+		);
+
+		if (checkDog.rowsCount > 0) {
+			return res.status(400).json({
+				result: false,
+				message: "Un animal à ce nom existe déjà pour cet.te humain.e",
+			});
+		}
+
 		const sqlResult = await Pool.query(
-			"INSERT INTO dogs (name, human, birth_date, gender, race1, race2) VALUES ($1, $2, $3, $4, $5, $6) RETURNING*",
+			"INSERT INTO dogs (name, human, birth_date, gender, race1, race2) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
 			[name, human, birth_date, gender, race1, race2],
 		);
 
