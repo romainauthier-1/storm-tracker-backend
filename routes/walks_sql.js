@@ -7,10 +7,14 @@ router.get("/", async (req, res) => {
 	try {
 		const sqlResult = await Pool.query("SELECT * FROM walks");
 
+		const walksWithDogName = await Pool.query(
+			"SELECT walks.*, dogs.name AS dog_name FROM walks JOIN dogs ON walks.walked_dog = dogs.id",
+		);
+
 		res.status(200).json({
 			result: true,
-			nbOfWalks: sqlResult.rowCount,
-			allWalks: sqlResult.rows,
+			nbOfWalks: walksWithDogName.rowCount,
+			allWalks: walksWithDogName.rows,
 		});
 	} catch (err) {
 		console.error(err);
@@ -54,13 +58,16 @@ router.post("/", async (req, res) => {
 				.json({ result: false, message: "Balade non ajoutée." });
 		}
 
-		res
-			.status(200)
-			.json({
-				result: true,
-				savedWalk: sqlResult.rows[0],
-				message: "Balade ajoutée !",
-			});
+		const dogName = await Pool.query(
+			"SELECT walks.*, dogs.name AS dog_name FROM walks JOIN dogs ON walks.walked_dog = dogs.id WHERE walks.id = $1",
+			[sqlResult.rows[0].id],
+		);
+
+		res.status(200).json({
+			result: true,
+			savedWalk: dogName.rows[0],
+			message: "Balade ajoutée !",
+		});
 	} catch (err) {
 		console.error(err);
 		res.status(500).json({ result: false, message: err.message });
