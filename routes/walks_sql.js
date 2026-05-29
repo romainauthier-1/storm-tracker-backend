@@ -48,27 +48,19 @@ router.post("/", async (req, res) => {
 			],
 		);
 
-		res.status(200).json({ result: true, savedBalade: sqlResult.rows[0] });
-	} catch (err) {
-		console.error(err);
-		res.status(500).json({ result: false, message: err.message });
-	}
-});
+		if (sqlResult.rowCount === 0) {
+			return res
+				.status(400)
+				.json({ result: false, message: "Balade non ajoutée." });
+		}
 
-// DELETE Supprimer une balade
-router.delete("/:walkId", async (req, res) => {
-	const { walkId } = req.params;
-
-	try {
-		const sqlResult = await Pool.query(
-			"DELETE FROM walks WHERE id = $1 RETURNING *",
-			[walkId],
-		);
-		res.status(200).json({
-			result: true,
-			deletedWalk: sqlResult.rows[0],
-			message: "Balade supprimée !",
-		});
+		res
+			.status(200)
+			.json({
+				result: true,
+				savedWalk: sqlResult.rows[0],
+				message: "Balade ajoutée !",
+			});
 	} catch (err) {
 		console.error(err);
 		res.status(500).json({ result: false, message: err.message });
@@ -105,6 +97,54 @@ router.patch("/update/:walkId", async (req, res) => {
 			result: true,
 			updatedWalk: sqlResult.rows[0],
 			message: "Balade mise à jour !",
+		});
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ result: false, message: err.message });
+	}
+});
+
+// DELETE Supprimer une balade
+router.delete("/:walkId", async (req, res) => {
+	const { walkId } = req.params;
+
+	try {
+		const sqlResult = await Pool.query(
+			"DELETE FROM walks WHERE id = $1 RETURNING *",
+			[walkId],
+		);
+		res.status(200).json({
+			result: true,
+			deletedWalk: sqlResult.rows[0],
+			message: "Balade supprimée !",
+		});
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ result: false, message: err.message });
+	}
+});
+
+// GET /walks/:humanId - Récupérer toutes les balades d'un humain
+router.get("/:humanId", async (req, res) => {
+	const { humanId } = req.params;
+
+	try {
+		const sqlResult = await Pool.query(
+			"SELECT * FROM walks WHERE walking_human = $1",
+			[humanId],
+		);
+
+		if (sqlResult.rowCount === 0) {
+			return res.status(404).json({
+				result: false,
+				message: "Pas de balades pour cet.te humain.e",
+			});
+		}
+
+		res.status(200).json({
+			result: true,
+			nbOfWalks: sqlResult.rowCount,
+			allWalks: sqlResult.rows,
 		});
 	} catch (err) {
 		console.error(err);
