@@ -6,7 +6,13 @@ const dogsRouter = require("./routes/dogs_sql");
 const walksRouter = require("./routes/walks_sql");
 const humansRouter = require("./routes/humans_sql");
 
-app.use(cors());
+app.use(
+	cors({
+		origin: true,
+		methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+		allowedHeaders: ["Content-Type", "Authorization"],
+	}),
+);
 app.use(express.json());
 
 app.use("/dogs", dogsRouter);
