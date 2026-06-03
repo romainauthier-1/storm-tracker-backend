@@ -4,7 +4,7 @@ let Pool;
 
 if (process.env.DB_CONNECTION_STRING) {
 	Pool = new pg.Pool({
-		connectionString: process.env.DB_CONNECTION_STRING,
+		connectionString: process.env.EXPO_PUBLIC_DB_CONNECTION_STRING,
 		ssl: { rejectUnauthorized: false },
 	});
 } else {
