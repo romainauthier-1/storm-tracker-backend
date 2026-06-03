@@ -14,7 +14,7 @@ app.use("/walks", walksRouter);
 app.use("/humans", humansRouter);
 
 app.get("/", (req, res) => {
-	res.json({ message: "Bienvenue sur l'API Storm Tracker !" });
+	res.json("🐕 Bienvenue sur l'API Storm Tracker !");
 });
 
 const PORT = process.env.PORT || 3000;
