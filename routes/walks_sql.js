@@ -34,11 +34,15 @@ router.post("/", async (req, res) => {
 		pooped,
 		peed,
 		notes,
+		dog_mood,
+		human_mood,
+		other,
+		coprophagie,
 	} = req.body;
 
 	try {
 		const sqlResult = await Pool.query(
-			"INSERT INTO walks (date, time, duration, meetings, pooped, peed, walked_dog, walking_human, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *",
+			"INSERT INTO walks (date, time, duration, meetings, pooped, peed, walked_dog, walking_human, notes, dog_mood, human_mood, other, coprophagie) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *",
 			[
 				date,
 				time,
@@ -49,6 +53,10 @@ router.post("/", async (req, res) => {
 				walked_dog,
 				walking_human,
 				notes,
+				dog_mood,
+				human_mood,
+				other,
+				coprophagie,
 			],
 		);
 
@@ -137,7 +145,7 @@ router.get("/:humanId", async (req, res) => {
 
 	try {
 		const sqlResult = await Pool.query(
-			"SELECT * FROM walks WHERE walking_human = $1",
+			"SELECT walks.*, dogs.name AS dog_name FROM walks JOIN dogs ON walks.walked_dog = dogs.id WHERE walks.walking_human = $1",
 			[humanId],
 		);
 
