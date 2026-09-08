@@ -1,33 +1,38 @@
 const express = require("express");
 const router = express.Router();
-const Pool = require("../db");
-const { body, validationResult } = require("express-validator");
+const { body, param } = require("express-validator");
 
-const validate = (req, res, next) => {
-	const errors = validationResult(req);
-	if (!errors.isEmpty()) {
-		return res.status(400).json({
-			result: false,
-			message: errors.array()[0].msg,
-		});
-	}
-	next();
-};
+const Pool = require("../db");
+const validate = require("../lib/validate");
+const httpError = require("../lib/http-error");
+const buildPartialUpdate = require("../lib/partial-update");
+
+// Columns a client is allowed to change through PATCH /update/:dogId.
+const DOG_UPDATABLE_COLUMNS = [
+	"name",
+	"human",
+	"birth_date",
+	"gender",
+	"race1",
+	"race2",
+];
+
+// dogs.gender is the Postgres enum gender_enum. Validate on write so a bad value
+// returns a clean 400 instead of a 500 from the driver. (PATCH goes through the
+// generic partial update and is not value-checked yet.)
+const GENDER_VALUES = ["MALE", "FEMALE", "INCONNU"];
+
+const idParam = (name) =>
+	param(name).isInt({ min: 1 }).withMessage("Identifiant invalide");
 
 // GET /dogs - Récupérer tous les chiens
 router.get("/", async (req, res) => {
-	try {
-		const sqlResult = await Pool.query("SELECT * FROM dogs");
-		// Vérifier qu'il y a une réponse (.length, propriété particulière SQL ?)
-		res.status(200).json({
-			result: true,
-			allDogs: sqlResult.rows,
-			nbOfDogs: sqlResult.rowCount,
-		});
-	} catch (err) {
-		console.error(err);
-		res.status(500).json({ result: false, message: err.message });
-	}
+	const sqlResult = await Pool.query("SELECT * FROM dogs ORDER BY id");
+	res.status(200).json({
+		result: true,
+		allDogs: sqlResult.rows,
+		nbOfDogs: sqlResult.rowCount,
+	});
 });
 
 // POST /dogs - Ajouter un nouveau chien
@@ -37,82 +42,68 @@ router.post(
 		body("name")
 			.notEmpty()
 			.withMessage("Cette boule de poil a forcément un nom !"),
-		body("human").notEmpty().withMessage("Impossible d'itentifier l'humain.e"),
+		body("human").notEmpty().withMessage("Impossible d'identifier l'humain.e"),
+		body("gender")
+			.optional({ values: "falsy" })
+			.isIn(GENDER_VALUES)
+			.withMessage("Genre invalide"),
 	],
 	validate,
 	async (req, res) => {
 		const { name, human, birth_date, gender, race1, race2 } = req.body;
 
-		try {
-			const checkDog = await Pool.query(
-				"SELECT * FROM dogs WHERE human = $1 AND name = $2",
-				[human, name],
+		const checkDog = await Pool.query(
+			"SELECT id FROM dogs WHERE human = $1 AND name = $2",
+			[human, name],
+		);
+		if (checkDog.rowCount > 0) {
+			throw httpError(
+				409,
+				"Un animal à ce nom existe déjà pour cet.te humain.e",
 			);
-
-			if (checkDog.rowsCount > 0) {
-				return res.status(400).json({
-					result: false,
-					message: "Un animal à ce nom existe déjà pour cet.te humain.e",
-				});
-			}
-
-			const sqlResult = await Pool.query(
-				"INSERT INTO dogs (name, human, birth_date, gender, race1, race2) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
-				[name, human, birth_date, gender, race1, race2],
-			);
-
-			res.status(200).json({
-				result: true,
-				savedDog: sqlResult.rows[0],
-				message: `${sqlResult.rows[0].name} a été ajouté !`,
-			});
-		} catch (err) {
-			console.error(err);
-			res.status(500).json({ result: false, message: err.message });
 		}
+
+		const sqlResult = await Pool.query(
+			"INSERT INTO dogs (name, human, birth_date, gender, race1, race2) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
+			[name, human, birth_date, gender, race1, race2],
+		);
+
+		res.status(200).json({
+			result: true,
+			savedDog: sqlResult.rows[0],
+			message: `${sqlResult.rows[0].name} a été ajouté !`,
+		});
 	},
 );
 
-// DELETE Supprimer un chien
-router.delete("/:dogId", async (req, res) => {
-	const { dogId } = req.params;
-
-	try {
-		const sqlResult = await Pool.query(
-			"DELETE FROM dogs WHERE id = $1 RETURNING *",
-			[dogId],
-		);
-		res.status(200).json({ result: true, deletedDog: sqlResult.rows[0] });
-	} catch (err) {
-		console.error(err);
-		res.status(500).json({ result: false, message: err.message });
+// DELETE /dogs/:dogId - Supprimer un chien
+router.delete("/:dogId", [idParam("dogId")], validate, async (req, res) => {
+	const sqlResult = await Pool.query(
+		"DELETE FROM dogs WHERE id = $1 RETURNING *",
+		[req.params.dogId],
+	);
+	if (sqlResult.rowCount === 0) {
+		throw httpError(404, "Animal non trouvé");
 	}
+	res.status(200).json({ result: true, deletedDog: sqlResult.rows[0] });
 });
 
-// UPDATE Mettre à jour un chien
-router.patch("/update/:dogId", async (req, res) => {
-	const { dogId } = req.params;
-	const queryParts = []; // récupérer les strings avec $1, $2, etc pour SQL
-	const queryValues = []; // récupérer les valeurs dans le même ordre
-
-	try {
-		for (const [key, value] of Object.entries(req.body)) {
-			// [["duration": 15], ["notes": "Cool"]]
-			queryValues.push(value);
-			queryParts.push(`${key} = $${queryValues.length}`);
-		}
-
-		const queryString = queryParts.join(", ");
-
-		const sqlResult = await Pool.query(
-			`UPDATE dogs SET ${queryString} WHERE id = ${dogId} RETURNING *`,
-			queryValues,
+// PATCH /dogs/update/:dogId - Mettre à jour un chien
+router.patch(
+	"/update/:dogId",
+	[idParam("dogId")],
+	validate,
+	async (req, res) => {
+		const { text, values } = buildPartialUpdate(
+			"dogs",
+			DOG_UPDATABLE_COLUMNS,
+			req.body,
+			req.params.dogId,
 		);
 
+		const sqlResult = await Pool.query(text, values);
 		if (sqlResult.rowCount === 0) {
-			return res
-				.status(404)
-				.json({ result: false, message: "Animal non trouvé" });
+			throw httpError(404, "Animal non trouvé");
 		}
 
 		res.status(200).json({
@@ -120,32 +111,26 @@ router.patch("/update/:dogId", async (req, res) => {
 			updatedDog: sqlResult.rows[0],
 			message: "Profil animal mis à jour !",
 		});
-	} catch (err) {
-		console.error(err);
-		res.status(500).json({ result: false, message: err.message });
-	}
-});
+	},
+);
 
-// GET Récupérer le(s) chien(s) selon l'id de l'humain
-router.get("/mydogs/:humanId", async (req, res) => {
-	const { humanId } = req.params;
-
-	try {
-		const sqlResult = await Pool.query("SELECT * FROM dogs WHERE human = $1", [
-			humanId,
-		]);
+// GET /dogs/mydogs/:humanId - Récupérer le(s) chien(s) d'un humain
+router.get(
+	"/mydogs/:humanId",
+	[idParam("humanId")],
+	validate,
+	async (req, res) => {
+		const sqlResult = await Pool.query(
+			"SELECT * FROM dogs WHERE human = $1 ORDER BY id",
+			[req.params.humanId],
+		);
 
 		if (sqlResult.rowCount === 0) {
-			return res
-				.status(404)
-				.json({ result: false, message: "Pas d'humain pour cet animal." });
+			throw httpError(404, "Pas de chien pour cet.te humain.e");
 		}
 
 		res.status(200).json({ result: true, dogs: sqlResult.rows });
-	} catch (err) {
-		console.error(err);
-		res.status(500).json({ result: false, message: err.message });
-	}
-});
+	},
+);
 
 module.exports = router;
