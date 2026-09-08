@@ -83,6 +83,35 @@ else
 	fail=$((fail + 1))
 fi
 
+# 9. /health public => 200 et db ok
+health_body="$(curl -s "$BASE_URL/health")"
+check "GET /health => 200" 200 "$(code "$BASE_URL/health")"
+if echo "$health_body" | grep -q '"db":"ok"'; then
+	echo "  ok   /health db:ok"
+	pass=$((pass + 1))
+else
+	echo "  FAIL /health db pas ok : $health_body"
+	fail=$((fail + 1))
+fi
+
+# 10. /status sans token => 401 (ou 503 si STATUS_TOKEN non configuré)
+status_code="$(code "$BASE_URL/status")"
+if [ "$status_code" = "401" ] || [ "$status_code" = "503" ]; then
+	echo "  ok   GET /status sans token => $status_code"
+	pass=$((pass + 1))
+else
+	echo "  FAIL GET /status sans token => $status_code (attendu 401 ou 503)"
+	fail=$((fail + 1))
+fi
+
+# 11. /status/data avec token (si STATUS_TOKEN fourni à ce script)
+if [ -n "${STATUS_TOKEN:-}" ]; then
+	check "GET /status/data?token=... => 200" 200 \
+		"$(code "$BASE_URL/status/data?token=$STATUS_TOKEN")"
+	check "GET /status/data?token=faux => 401" 401 \
+		"$(code "$BASE_URL/status/data?token=faux")"
+fi
+
 echo
 echo "$pass ok / $fail fail"
 [ "$fail" -eq 0 ]
