@@ -6,6 +6,7 @@
 		"dev": "nodemon app.js",
 		"migrate": "node scripts/migrate.js",
 		"migrate:status": "node scripts/migrate.js --status",
+		"introspect": "node scripts/introspect.js",
 		"smoke": "bash scripts/smoke.sh"
 	},
 	"dependencies": {
