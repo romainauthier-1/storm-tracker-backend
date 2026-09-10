@@ -150,7 +150,7 @@ router.delete("/:walkId", [idParam("walkId")], validate, async (req, res) => {
 // GET /walks/:humanId - Récupérer toutes les balades d'un humain
 router.get("/:humanId", [idParam("humanId")], validate, async (req, res) => {
 	const sqlResult = await Pool.query(
-		`${WALK_WITH_DOG_NAME} WHERE walks.walking_human = $1 ORDER BY walks.id`,
+		`${WALK_WITH_DOG_NAME} WHERE walks.walking_human = $1 ORDER BY walks.date DESC, walks.id DESC`,
 		[req.params.humanId],
 	);
 
