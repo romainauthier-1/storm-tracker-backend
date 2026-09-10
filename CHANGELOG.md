@@ -48,6 +48,9 @@ Une entrée par lot mergé, sous la version en préparation.
 - `POST /walks` : `dog_mood` / `human_mood` / `other` repliés sur `[]`
   (colonnes `text[] NOT NULL`). `POST /dogs` : `gender` validé contre l'enum
   `gender_enum` (400 propre au lieu d'un 500 driver).
+- `002_hardening.sql` : le bloc `dogs_human_name_key` échouait au rejeu si la
+  contrainte existait déjà (`duplicate_table`, non attrapé). Remplacé par un
+  test d'existence — la migration est vraiment idempotente.
 - Documentation (`README.md`, `conventions.md`, `CONTRIBUTING.md`, `CLAUDE.md`,
   `.claude/`) réécrite pour ce repo (elle décrivait un autre projet).
 
