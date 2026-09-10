@@ -40,10 +40,17 @@ EXCEPTION WHEN others THEN RAISE NOTICE 'walks.walking_human SET NOT NULL ignor�
 END $$;
 
 -- --- un chien porte un nom unique chez un même humain
+-- On teste l'existence plutôt que d'attraper l'exception : une contrainte UNIQUE
+-- crée un index homonyme, donc la reposer lève `duplicate_table`
+-- (« relation … already exists »), pas `duplicate_object`.
 DO $$ BEGIN
-	ALTER TABLE dogs ADD CONSTRAINT dogs_human_name_key UNIQUE (human, name);
+	IF NOT EXISTS (
+		SELECT 1 FROM pg_constraint
+		WHERE conname = 'dogs_human_name_key' AND conrelid = 'dogs'::regclass
+	) THEN
+		ALTER TABLE dogs ADD CONSTRAINT dogs_human_name_key UNIQUE (human, name);
+	END IF;
 EXCEPTION
-	WHEN duplicate_object THEN NULL;
 	WHEN unique_violation THEN
 		RAISE NOTICE 'dogs (human, name) : doublons existants, UNIQUE non posée';
 END $$;
