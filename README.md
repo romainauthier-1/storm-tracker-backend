@@ -1,13 +1,24 @@
 # 🐕 Storm Tracker — Backend
 
-API REST pour suivre les balades de chiens : chiens, humains, balades.
-Node.js + **Express 5** (CommonJS) devant **Neon Postgres**. Déploiement Vercel.
+API REST de l'application Storm Tracker (suivi des balades de ses chiens) : gestion des comptes, des chiens et des balades.
+Node.js + **Express 5** devant **PostgreSQL (Neon)**, requêtes SQL paramétrées, migrations versionnées, déployée sur Vercel.
+
+**Frontend :** [storm-tracker](https://github.com/romainauthier-1/storm-tracker) · **Démo :** [storm-tracker-blush.vercel.app](https://storm-tracker-blush.vercel.app)
+
+### Points techniques
+
+- **SQL sans ORM** : `pg` avec requêtes paramétrées, UPDATE partiels générés à partir d'une liste blanche de colonnes.
+- **Migrations versionnées** avec un runner maison idempotent (`schema_migrations`) et un script d'introspection pour comparer la base réelle au schéma attendu.
+- **Sécurité HTTP** : Helmet, CORS en liste blanche, validation des entrées (express-validator), mots de passe hachés (bcrypt), rate limiting sur l'inscription et la connexion, erreurs Postgres traduites sans exposer de détails internes.
+- **Observabilité** : `/health` (ping DB), journal des requêtes en base et page `/status` protégée par jeton (trafic 24 h, routes, erreurs).
 
 ---
 
 ## Démarrage
 
 ```bash
+git clone https://github.com/romainauthier-1/storm-tracker-backend.git
+cd storm-tracker-backend
 yarn install
 cp .env.example .env      # renseigner au minimum DB_CONNECTION_STRING
 yarn migrate              # applique migrations/*.sql (idempotent)
@@ -114,8 +125,10 @@ Colonnes modifiables via PATCH : `name`, `human`, `birth_date`, `gender`,
 | DELETE  | `/humans/:humanId`        | supprimer un humain (cascade chiens / balades) |
 
 Mots de passe hachés `bcrypt` (12 tours). `signin`/`signup` sont
-rate-limités (20 requêtes / 15 min / IP). Il n'y a **pas encore**
-d'authentification par jeton sur les autres routes (chantier à venir).
+rate-limités (20 requêtes / 15 min / IP). Les autres routes ne sont pas
+encore protégées par un jeton d'authentification : le client identifie
+l'utilisateur par son `humanId`. L'ajout d'une authentification JWT est la
+prochaine évolution prévue.
 
 ### Balades — `/walks`
 
@@ -187,14 +200,8 @@ requêtes dessus. Vercel redéploie sur push de `master`.
 À configurer côté Vercel (Environment Variables) : `DB_CONNECTION_STRING`
 (URL -pooler), `CORS_ORIGINS`, `STATUS_TOKEN`, éventuellement `NODE_ENV`.
 Après un changement de schéma : lancer `yarn migrate` depuis un poste ayant
-l'URL de prod (voir la skill `db-migrate`).
+l'URL de prod.
 
 ---
 
-## Contribuer
-
-Voir [`CONTRIBUTING.md`](CONTRIBUTING.md) (méthode) et
-[`conventions.md`](conventions.md) (code). Licence MIT.
-
-Auteur : **Romain Authier** — [@dankysten](https://github.com/dankysten),
-papa de Storm 🐕.
+Romain Authier — [GitHub](https://github.com/romainauthier-1)

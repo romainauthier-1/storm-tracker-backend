@@ -1,2 +1,8 @@
 .env
 node_modules/
+# Notes et outillage locaux (non versionnés)
+.claude/
+CLAUDE.md
+CONTRIBUTING.md
+conventions.md
+CHANGELOG.md
